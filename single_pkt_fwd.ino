@@ -20,10 +20,11 @@
 #include <SPI.h>
 #include <LoRa.h>
 
-#define SWEEP 0
+//#define SWEEP 0
+//#define RSTATE 0
 
-String Sketch_Ver = "single_pkt_fwd_v002.10";
-float freq;
+String Sketch_Ver = "single_pkt_fwd_v002.24";
+long freq;
 int SF, CR;
 long BW, preLen;
 long old_time = millis();
@@ -81,10 +82,18 @@ void setup() {
 
   delay(3000);
   sendGatewayStat(); // Upload GW status to LoRaWAN server
+
+#if defined(RSTATE)
+  Console.println("X");
+  LoRa.onReceive(onReceive);
+  Console.println("X");
+  LoRa.receive();
+  Console.println("X");
+#endif /* #define RSTATE 1 */
 }
 
 void loop() {
-
+#if !defined(RSTATE)
 #ifdef SWEEP
   for ( int i = +2; i >= -2; i--) {
     float sweep = freq + (200000 * i);
@@ -93,9 +102,10 @@ void loop() {
     Console.println(sweep);
     receivepacket();
   }
-#else
+#else /* SWEEP */
   receivepacket();
-#endif /* 0 */
+#endif /* SWEEP */
+#endif /* RSTATE */
 
   // Update Gateway Status
   new_time = millis();
@@ -105,7 +115,6 @@ void loop() {
     sendGatewayStat();
   }
 }
-
 
 //Update Gateway Status to IoT Server
 void sendGatewayStat() {
@@ -132,7 +141,7 @@ void getRadioConf() {
     fre1[j] = p.read();
     j++;
   }
-  freq = atof(fre1);
+  freq = 868.1E6;//atol(fre1);
 
   //Read Spread Factor
   char sf1[3];
@@ -218,7 +227,15 @@ void receivepacket() {
   int packetSize = LoRa.parsePacket();
   if (packetSize)
   {
-    // Received a packet
+    onReceive(packetSize);
+    // Ensure the last bit of data is sent.
+    if ( debug > 0 ) Console.flush();
+  }
+}
+
+void onReceive(int packetSize) {
+  Console.println("Y");
+      // Received a packet
     if ( debug > 0 )
     {
       Console.print("Get Packet:");
@@ -262,9 +279,7 @@ void receivepacket() {
       char c = p.read();
       if ( debug > 0 ) Console.print(c);
     }
-    // Ensure the last bit of data is sent.
     if ( debug > 0 ) Console.flush();
-  }
 }
 
 //Function to write sketch version number into Linux.
